@@ -1,0 +1,15 @@
+Debug
+creptile.sln
+libevent-2.1.8-stable/
+Debug/
+.vs
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.exe
+*.log
+*.txt
+
+
+creptile/Debug
+
