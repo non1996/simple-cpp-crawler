@@ -71,7 +71,10 @@ public:
 	http_parser();
 	~http_parser();
 
-	//	parse
+	void reset();
+	bool is_type_close();
+	const string &get_status_line();
+	const vector<pair<string, string>> &get_headers();
 	const string &get_body();
 	bool parse(const char *_buf, size_t len);
 };

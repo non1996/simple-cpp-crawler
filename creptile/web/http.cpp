@@ -24,6 +24,29 @@ http_parser::http_parser() {
 http_parser::~http_parser() {
 }
 
+void http_parser::reset() {
+	line.clear();
+	headers.clear();
+	body.clear();
+	buf.clear();
+	s = singleton<state_line>::instance();
+	content_length = 0;
+	next_chunk_size = 0;
+	type = trans_type::close;
+}
+
+bool http_parser::is_type_close() {
+	return type == trans_type::close;
+}
+
+const string & http_parser::get_status_line() {
+	return line;
+}
+
+const vector<pair<string, string>>& http_parser::get_headers() {
+	return headers;
+}
+
 const string & http_parser::get_body() {
 	return body;
 }

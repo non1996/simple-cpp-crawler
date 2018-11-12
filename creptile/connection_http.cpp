@@ -1,77 +1,72 @@
 #include "connection_http.h"
 #include "http.h"
+#include "util.h"
 #include "log.h"
+#include "evhead.h"
 
-#include <event2/event.h>
-#include <event2/buffer.h>
-#include <event2/bufferevent.h>
-
-inline std::string connection_http::dns_parse(const std::string & url) {
-	hostent *host = gethostbyname(url.c_str());
-	return host ? inet_ntoa(*(in_addr *)host->h_addr_list[0]) : "";
+inline string connection_http::dns_parse(const string & host) {
+	hostent *hostt = gethostbyname(host.c_str());
+	return hostt ? inet_ntoa(*(in_addr *)hostt->h_addr_list[0]) : "";
 }
 
-void connection_http::read_evcb(bufferevent * bev, void * conn) {
-	connection_http *conn_h = static_cast<connection_http*>(conn);
-	connection *conn_r = dynamic_cast<connection*>(conn_h);
+void connection_http::read_ev(bufferevent * bev, void * _conn) {
+	connection_http *conn = static_cast<connection_http*>(_conn);
 	size_t len;
 	char *buf;
 
-	buf = new char[conn_h->inbuf_size()];
-	len = conn_h->inbuf_size();
-	conn_h->recv(buf, &len); 
-	conn_h->reply->append(buf, len);
-	if (conn_h->reply->parse_response())
-		assert(0);// entile reply tell others
-	delete[] buf;
-}
+	len = conn->inbuf_size();
+	buf = new char[len];
+	conn->recv(buf, &len); 
 
-void connection_http::event_evcb(bufferevent * bev, short events, void * conn) {
-	connection_http *conn_h = static_cast<connection_http*>(conn);
-	if (events & BEV_EVENT_CONNECTED) {
-		log_info("Connection %lu connected.", conn_h->get_id());
-		conn_h->set_state(state::working);
-	}
-	if (events & BEV_EVENT_ERROR) {
-		log_info("Connection %lu meet an error, %d[%s], it will be close.",
-			conn_h->get_id(), EVUTIL_SOCKET_ERROR(), evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
-		conn_h->close();
-	}
+	if (conn->parser->parse(buf, len))
+		callback(conn->read_cb, conn->arg, conn);
+
+	delete[] buf;
 }
 
 void connection_http::setup_bev(evutil_socket_t fd) {
 	connection::setup_bev(fd);
-	bufferevent_setcb(get_bev(), read_evcb, nullptr, event_evcb, this);
+	bufferevent_setcb(get_bev(), connection_http::read_ev, nullptr, connection::event_ev, this);
 }
 
 connection_http::connection_http(uint32_t global_id):
 	connection(global_id) {
-	reply = new http;
+	parser = new http_parser;
 }
 
 
 connection_http::~connection_http() {
-	delete reply;
+	delete parser;
 }
 
-bool connection_http::connect(const std::string & url) {
-	std::string ip = dns_parse(url);
+bool connection_http::connect(const string & _url) {
+	auto pair = util::string_split_pair(_url, '/');
+	host = pair.first;
+	resource = pair.second;
+	url = _url;
 
+	std::string ip = dns_parse(host);
 	if (ip.empty())
 		return false;
 
-	this->url = url;
-	reply->clear();
+	parser->reset();
 
 	return connection::connect(ip, 80);
 }
 
-bool connection_http::send_req(const http & request) {
-	std::string req = request.to_buf();
+bool connection_http::send_req() {
+	string req
+		= "GET " + resource + " HTTP/1.1\r\n"
+		+ "HOST: " + host + "\r\n"
+		+ "Connection: close\r\n\r\n";
+
+	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__,
+		"Send http request, host: %s, get: %s.", host.c_str(), resource.c_str());
+
 	return connection::send(req.c_str(), req.size());
 }
 
-bool connection_http::recv_rply(http &reply) {
-	reply = *(this->reply);
+bool connection_http::recv_rply(string &reply) {
+	reply = parser->get_body();
 	return true;
 }

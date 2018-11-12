@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #elif defined(WIN32)
 #include <WinSock2.h>
+#pragma comment(lib, "ws2_32.lib")
 #endif
 
 #include "mem_alloc.h"
@@ -47,3 +48,6 @@ typedef unsigned short wchar;
 #define constructor(classname, ...) classname *classname ## _constructor(classname *self, ##__VA_ARGS__)
 #define constructor_end return self
 #define distructor(classname) void classname ## _distructor(classname *self)
+
+typedef void(*callback_fn)(void*, void*);
+#define callback(fn, arg1, arg2) do { if ((fn)) (fn)((arg1), (arg2)); } while(0)

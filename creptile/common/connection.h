@@ -6,6 +6,8 @@
 
 struct bufferevent;
 
+using std::string;
+
 class connection {
 public:
 	const static uint8_t read = 0x02u;
@@ -38,15 +40,26 @@ private:
 	bool to_close;
 
 protected:
+	callback_fn read_cb;
+	callback_fn write_cb;
+	callback_fn error_cb;
+	callback_fn close_cb;
+	callback_fn connected_cb;
+	void *arg;
+
 	void set_state(state s);
 
 	inline struct bufferevent *get_bev() {
 		return bev;
 	}
 
-	virtual void setup_bev(evutil_socket_t fd) = 0;
+	virtual void setup_bev(evutil_socket_t fd);
 
 	static void sockaddr_construct(struct sockaddr_in *sin, const char *address, uint16_t port);
+
+	static void event_ev(struct bufferevent *bev, short events, void *conn);
+	static void read_ev(struct bufferevent *bev, void *conn);
+	static void write_ev(struct bufferevent *bev, void *conn);
 
 public:
 	connection(uint32_t global_id);
@@ -86,6 +99,7 @@ public:
 
 	bool connect(const std::string &ip, uint16_t port);
 	void close();
+	bool is_close();
 
 	bool recv(char *buf, size_t *len);
 
@@ -96,4 +110,6 @@ public:
 
 	size_t inbuf_size();
 	size_t outbuf_size();
+
+	void set_cb(callback_fn read_cb, callback_fn write_cb, callback_fn error_cb, callback_fn close_cb, callback_fn connected_cb, void *arg);
 };

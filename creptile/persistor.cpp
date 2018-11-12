@@ -11,19 +11,6 @@ void persistor::persist_urls() {
 	}
 }
 
-void persistor::persist_html(const string & body) {
-	static char buf[32];
-	if (should_persist_html && body.size()) {
-		ofstream fout(saving_path + itoa(count, buf, 10), std::ios_base::app);
-
-		if (!fout.is_open()) {
-			return;
-		}
-		fout.write(body.c_str(), body.size());
-		fout.close();
-	}
-}
-
 persistor::persistor(const string & _saving_path, const string & _urls_filename, size_t _threshold)
 	:saving_path(_saving_path), urls_filename(_urls_filename), threshold(_threshold){
 	urls.reserve(threshold);
@@ -31,16 +18,31 @@ persistor::persistor(const string & _saving_path, const string & _urls_filename,
 }
 
 persistor::~persistor() {
+	if (urls.size() != 0)
+		persist_urls();
 }
 
-void persistor::append(const pair<string, string>& url_pair, const string & body) {
-	urls.push_back(url_pair);
+void persistor::append(const string & from, const string url) {
+	urls.emplace_back(from, url);
 	count++;
 
 	if (urls.size() == threshold) {
 		persist_urls();
 		urls.clear();
 	}
+}
 
-	persist_html(body);
+void persistor::persist_body(const string &url, const string & body) {
+	static char buf[32];
+	if (should_persist_html && body.size()) {
+		ofstream fout(saving_path + itoa(count, buf, 10) + ".txt", std::ios_base::app);
+
+		if (!fout.is_open())
+			return;
+		
+		fout.write(url.c_str(), url.size());
+		fout.write("\n\n", 2);
+		fout.write(body.c_str(), body.size());
+		fout.close();
+	}
 }

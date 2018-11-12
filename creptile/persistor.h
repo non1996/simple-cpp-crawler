@@ -3,13 +3,16 @@
 #include "afx.h"
 #include <vector>
 #include <string>
+#include <map>
 using std::vector;
 using std::string;
 using std::pair;
+using std::map;
 
 class persistor {
 private:
 	vector<pair<string, string>> urls;
+
 	size_t threshold;
 	size_t count;
 	
@@ -18,12 +21,13 @@ private:
 	bool should_persist_html;
 
 	void persist_urls();
-	void persist_html(const string &body);
+	
 
 public:
 	persistor(const string &_saving_path, const string &_urls_filename, size_t _treshold);
 	~persistor();
 
-	void append(const pair<string, string> &url_pair, const string &body);
+	void append(const string &from, const string url);
+	void persist_body(const string &url, const string &body);
 };
 
