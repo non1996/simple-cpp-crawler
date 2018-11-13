@@ -3,37 +3,11 @@
 #include "bloom_filter.h"
 #include "persistor.h"
 #include "connection.h"
+#include "connection_http.h"
 #include "util.h"
 #include "log.h"
 #include "ev_mainloop.h"
 #include <regex>
-
-string crawler::get_ip_by_host(const string & host) {
-	hostent* phost = gethostbyname(host.c_str());
-	return phost ? inet_ntoa(*(in_addr *)phost->h_addr_list[0]) : "";
-}
-
-bool crawler::connection_connect_host(connection *conn, const string & host) {
-	auto ip = get_ip_by_host(host);
-	if (ip.empty()) {
-		singleton<logger>::instance()->warm_fn(__FILE__, __LINE__, __func__, "Could not resolve dns %s.", host.c_str());
-		return false;
-	}
-
-	return conn->connect(ip, 80);
-}
-
-bool crawler::connection_send_request(connection *conn, const string & host, const string & get) {
-	string http
-		= "GET " + get + " HTTP/1.1\r\n"
-		+ "HOST: " + host + "\r\n"
-		+ "Connection: close\r\n\r\n";
-
-	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__, 
-		"Send http request, host: %s, get: %s.", host.c_str(), get.c_str());
-
-	return conn->send(http.c_str(), http.size());
-}
 
 void crawler::waiting_list_append(const string & url) {
 	if (!filter->contains(url)) {
@@ -42,7 +16,7 @@ void crawler::waiting_list_append(const string & url) {
 	}
 }
 
-void crawler::resolve_url(const string & url_from, const string & body) {
+void crawler::resolve_body(const string & url_from, const string & body) {
 	if (body.empty()) {
 		return;
 	}
@@ -58,68 +32,38 @@ void crawler::resolve_url(const string & url_from, const string & body) {
 }
 
 void crawler::mission_dispatch() {
-	curr_url = waiting.front();
-	auto pair = util::string_split_pair(curr_url, '/');
-
+	auto &url = waiting.front();
+	
 	count++;
 	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "New mission %dth.", count);
-	connection_connect_host(conn, pair.first);
+	conn->connect(url);
 	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__, "Waiting Urls: %d.", waiting.size());
+	waiting.pop_front();
 }
 
 void crawler::connection_connected_cb(void * craw, void *_conn) {
 	crawler *self = static_cast<crawler*>(craw);
-	connection *conn = static_cast<connection*>(_conn);
+	connection_http *conn = static_cast<connection_http*>(_conn);
 
-	auto pair = util::string_split_pair(self->curr_url, '/');
-	connection_send_request(conn, pair.first, "/" + pair.second);
-}
-
-void crawler::connection_close_cb(void * craw, void *_conn) {
-	crawler *self = static_cast<crawler*>(craw);
-	connection *conn = static_cast<connection*>(_conn);
-
-	if (self->parser->is_type_close()) {
-		auto &status_line = self->parser->get_status_line();
-		auto &body = self->parser->get_body();
-		auto &url = self->waiting.front();
-
-		singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__, 
-			"Receive http reply, body length: %d, status: %s.", body.size(), status_line.substr(9, 3).c_str());
-
-		self->resolve_url(url, body);
-		self->parser->reset();
-	}
-	self->waiting.pop_front();
+	conn->send_req();
 }
 
 void crawler::connection_read_cb(void * craw, void * _conn) {
 	crawler *self = static_cast<crawler*>(craw);
-	connection *conn = static_cast<connection*>(_conn);
+	connection_http *conn = static_cast<connection_http*>(_conn);
 
-	size_t size;
-	char *buf;
+	http_parser *parser = conn->recv_rply();
 
-	size = self->conn->inbuf_size();
-	buf = new char[size];
+	auto &status_line = parser->get_status_line();
+	auto &body = parser->get_body();
+	auto &url = conn->get_url();
 
-	self->conn->recv(buf, &size);
+	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__,
+		"Receive http reply, body length: %d, status: %s.", body.size(), status_line.substr(9, 3).c_str());
 
-	if (self->parser->parse(buf, size)) {
-		auto &status_line = self->parser->get_status_line();
-		auto &body = self->parser->get_body();
-		auto &url = self->waiting.front();
-
-		singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__,
-			"Receive http reply, body length: %d, status: %s.", body.size(), status_line.substr(9, 3).c_str());
-
-		self->resolve_url(url, body);
-		self->waiting.pop_front();
-		self->conn->close();
-		self->parser->reset();
-	}
-
-	delete [] buf;
+	self->resolve_body(url, body);
+	self->persist->persist_body(url, body);
+	self->conn->close();
 }
 
 void crawler::check(void * craw) {
@@ -128,7 +72,7 @@ void crawler::check(void * craw) {
 	if (!self->conn->is_close())
 		return;
 
-	if (self->waiting.size() == 0 || self->max_page <= self->count) {
+	if (self->waiting.empty() || self->max_page <= self->count) {
 		singleton<ev_mainloop>::instance()->mark_for_close();
 		return;
 	}
@@ -139,14 +83,13 @@ void crawler::check(void * craw) {
 crawler::crawler() {
 	filter = new bloom_filter(2000);
 	persist = new persistor("result\\", "url_relations.txt", 200);
-	conn = new connection(0);
-	parser = new http_parser;
+	conn = new connection_http(0);
 	is_init = true;
 	
 	count = 0;
 	max_page = 0;
 
-	conn->set_cb(connection_read_cb, nullptr, nullptr, connection_close_cb, connection_connected_cb, this);
+	conn->set_cb(connection_read_cb, nullptr, nullptr, nullptr, connection_connected_cb, this);
 }
 
 crawler::crawler(int argc, char ** argv) {

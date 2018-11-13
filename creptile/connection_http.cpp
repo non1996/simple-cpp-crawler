@@ -24,9 +24,27 @@ void connection_http::read_ev(bufferevent * bev, void * _conn) {
 	delete[] buf;
 }
 
+void connection_http::event_ev(bufferevent * bev, short events, void * conn) {
+	connection_http *self = static_cast<connection_http*>(conn);
+
+	if (events & BEV_EVENT_EOF) {
+		singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__,
+			"Connection %d meet eof, it will be close.", self->get_id());
+		
+		if (self->parser->is_type_close())
+			callback(self->read_cb, self->arg, self);
+
+		self->close();
+
+		return;
+	}
+
+	connection::event_ev(bev, events, conn);
+}
+
 void connection_http::setup_bev(evutil_socket_t fd) {
 	connection::setup_bev(fd);
-	bufferevent_setcb(get_bev(), connection_http::read_ev, nullptr, connection::event_ev, this);
+	bufferevent_setcb(get_bev(), connection_http::read_ev, nullptr, connection_http::event_ev, this);
 }
 
 connection_http::connection_http(uint32_t global_id):
@@ -34,15 +52,18 @@ connection_http::connection_http(uint32_t global_id):
 	parser = new http_parser;
 }
 
-
 connection_http::~connection_http() {
 	delete parser;
+}
+
+const string & connection_http::get_url() {
+	return url;
 }
 
 bool connection_http::connect(const string & _url) {
 	auto pair = util::string_split_pair(_url, '/');
 	host = pair.first;
-	resource = pair.second;
+	resource = "/" + pair.second;
 	url = _url;
 
 	std::string ip = dns_parse(host);
@@ -52,6 +73,13 @@ bool connection_http::connect(const string & _url) {
 	parser->reset();
 
 	return connection::connect(ip, 80);
+}
+
+void connection_http::close() {
+	url.clear();
+	host.clear();
+	resource.clear();
+	connection::close();
 }
 
 bool connection_http::send_req() {
@@ -66,7 +94,6 @@ bool connection_http::send_req() {
 	return connection::send(req.c_str(), req.size());
 }
 
-bool connection_http::recv_rply(string &reply) {
-	reply = parser->get_body();
-	return true;
+http_parser * connection_http::recv_rply() {
+	return parser;
 }

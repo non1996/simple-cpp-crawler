@@ -11,17 +11,23 @@ using std::map;
 
 class persistor {
 private:
-	vector<pair<string, string>> urls;
+	struct relation{
+		const string &url;
+		vector<size_t> to;
 
-	size_t threshold;
-	size_t count;
+		relation(const string &_url)
+			:url(_url) {
+
+		}
+	};
+
+	map<string, size_t> url_to_id;
+	vector<relation> relations;
 	
 	string saving_path;
 	string urls_filename;
-	bool should_persist_html;
 
 	void persist_urls();
-	
 
 public:
 	persistor(const string &_saving_path, const string &_urls_filename, size_t _treshold);

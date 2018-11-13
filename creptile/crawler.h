@@ -7,7 +7,7 @@ using std::string;
 
 class persistor;
 class bloom_filter;
-class connection;
+class connection_http;
 class http_parser;
 
 class crawler {
@@ -17,9 +17,7 @@ private:
 	bloom_filter *filter;
 	persistor *persist;
 
-	http_parser *parser;
-	connection *conn;
-	string curr_url;
+	connection_http *conn;
 
 	size_t max_page, count;
 
@@ -27,16 +25,11 @@ private:
 	bool done;
 
 	void waiting_list_append(const string &url);
-	void resolve_url(const string &url_from, const string &body);
+	void resolve_body(const string &url_from, const string &body);
 	void mission_dispatch();
 
-	static string get_ip_by_host(const string &host);
-	static bool connection_connect_host(connection *conn, const string &host);
-	static bool connection_send_request(connection *conn, const string &host, const string &get);
 	static void connection_connected_cb(void *craw, void *conn);
-	static void connection_close_cb(void *craw, void *conn);
 	static void connection_read_cb(void *craw, void *conn);
-	
 	static void check(void *craw);
 
 public:

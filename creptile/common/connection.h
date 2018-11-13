@@ -98,7 +98,7 @@ public:
 	}
 
 	bool connect(const std::string &ip, uint16_t port);
-	void close();
+	virtual void close();
 	bool is_close();
 
 	bool recv(char *buf, size_t *len);
