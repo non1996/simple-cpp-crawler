@@ -33,6 +33,7 @@ void http_parser::reset() {
 	content_length = 0;
 	next_chunk_size = 0;
 	type = trans_type::close;
+	offset = 0;
 }
 
 bool http_parser::is_type_close() {
@@ -151,5 +152,6 @@ bool http_parser::state_body_close::parse(http_parser * hp) {
 	if (hp->buf.size() > hp->offset)
 		hp->body.append(hp->buf.c_str() + hp->offset, hp->buf.size() - hp->offset);
 	hp->offset = hp->buf.size();
+
 	return false;
 }

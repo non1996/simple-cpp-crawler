@@ -28,13 +28,16 @@ void connection::event_ev(bufferevent * bev, short events, void * conn) {
 
 void connection::read_ev(bufferevent * bev, void * conn) {
 	connection *self = static_cast<connection*>(conn);
-
+	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__,
+		"Connection %d received something.", self->global_id);
 	callback(self->read_cb, self->arg, self);
 }
 
 void connection::write_ev(bufferevent * bev, void * conn) {
 	(void)bev;
 	connection *self = static_cast<connection*>(conn);
+	singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__,
+		"Connection %d sent something.", self->global_id);
 	callback(self->write_cb, self->arg, self);
 }
 
@@ -94,6 +97,13 @@ connection::connection(uint32_t global_id) {
 
 	//is_master = true;
 	to_close = false;
+
+	read_cb = nullptr;
+	write_cb = nullptr;
+	error_cb = nullptr;
+	close_cb = nullptr;
+	connected_cb = nullptr;
+	arg = nullptr;
 }
 
 connection::~connection() {
@@ -113,7 +123,7 @@ bool connection::connect(const std::string & ip, uint16_t port) {
 	setup_bev(-1);
 
 	if (bufferevent_socket_connect(bev, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
-		singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__, "Connection %lu connect to %s:%d failed.", global_id, ip, port);
+		singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__, "Connection %lu connect to %s:%d failed.", global_id, ip.c_str(), port);
 		return false;
 	}
 
@@ -121,7 +131,7 @@ bool connection::connect(const std::string & ip, uint16_t port) {
 	remote_address = ip;
 	remote_port = port;
 
-	singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__, "Connection %lu launch connect to %s:%d successfully, wait for connected.", global_id, ip, port);
+	singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__, "Connection %lu launch connect to %s:%d successfully, wait for connected.", global_id, ip.c_str(), port);
 
 	return true;
 }
@@ -183,11 +193,11 @@ void connection::disable(uint8_t mode) {
 }
 
 size_t connection::inbuf_size() {
-	return size_t();
+	return evbuffer_get_length(bufferevent_get_input(bev));
 }
 
 size_t connection::outbuf_size() {
-	return size_t();
+	return evbuffer_get_length(bufferevent_get_output(bev));
 }
 
 void connection::set_cb(callback_fn _read_cb, callback_fn _write_cb, callback_fn _error_cb, 

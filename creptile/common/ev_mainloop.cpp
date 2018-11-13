@@ -4,7 +4,23 @@
 
 singleton<ev_mainloop> ev_mainloop::instance;
 
+namespace {
+	inline void network_startup() {
+		WSADATA wsadata;
+		WSAStartup(MAKEWORD(2, 0), &wsadata);
+	}
+
+	inline void network_cleanup() {
+		WSACleanup();
+	}
+}
+
+
+
+
 ev_mainloop::ev_mainloop() {
+	network_startup();
+	atexit(network_cleanup);
 	evbase = event_base_new();
 	done = false;
 }
@@ -27,8 +43,13 @@ void ev_mainloop::loop() {
 			mark_for_close();
 			continue;
 		}
-
+		period_check(arg);
 	}
 
 	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "Mainloop exit.");
+}
+
+void ev_mainloop::set_period(void(*_period_check)(void *), void *_arg) {
+	period_check = _period_check;
+	arg = _arg;
 }

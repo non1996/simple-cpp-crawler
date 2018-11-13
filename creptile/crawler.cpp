@@ -57,28 +57,29 @@ void crawler::resolve_url(const string & url_from, const string & body) {
 	}
 }
 
-void crawler::new_mission() {
+void crawler::mission_dispatch() {
 	curr_url = waiting.front();
 	auto pair = util::string_split_pair(curr_url, '/');
 
+	count++;
 	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "New mission %dth.", count);
 	connection_connect_host(conn, pair.first);
-	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__, "Waiting Urls.", waiting.size());
+	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__, "Waiting Urls: %d.", waiting.size());
 }
 
-void crawler::connnection_connected_cb(void * craw, void *_conn) {
+void crawler::connection_connected_cb(void * craw, void *_conn) {
 	crawler *self = static_cast<crawler*>(craw);
 	connection *conn = static_cast<connection*>(_conn);
 
 	auto pair = util::string_split_pair(self->curr_url, '/');
-	connection_send_request(conn, pair.first, pair.second);
+	connection_send_request(conn, pair.first, "/" + pair.second);
 }
 
 void crawler::connection_close_cb(void * craw, void *_conn) {
 	crawler *self = static_cast<crawler*>(craw);
 	connection *conn = static_cast<connection*>(_conn);
 
-	if (self->parser->is_type_close() && self->parser->parse("", 0)) {
+	if (self->parser->is_type_close()) {
 		auto &status_line = self->parser->get_status_line();
 		auto &body = self->parser->get_body();
 		auto &url = self->waiting.front();
@@ -87,7 +88,7 @@ void crawler::connection_close_cb(void * craw, void *_conn) {
 			"Receive http reply, body length: %d, status: %s.", body.size(), status_line.substr(9, 3).c_str());
 
 		self->resolve_url(url, body);
-		self->count++;
+		self->parser->reset();
 	}
 	self->waiting.pop_front();
 }
@@ -115,7 +116,7 @@ void crawler::connection_read_cb(void * craw, void * _conn) {
 		self->resolve_url(url, body);
 		self->waiting.pop_front();
 		self->conn->close();
-		self->count++;
+		self->parser->reset();
 	}
 
 	delete [] buf;
@@ -127,21 +128,25 @@ void crawler::check(void * craw) {
 	if (!self->conn->is_close())
 		return;
 
-	if (self->waiting.size() == 0 || self->max_page == self->count) {
+	if (self->waiting.size() == 0 || self->max_page <= self->count) {
 		singleton<ev_mainloop>::instance()->mark_for_close();
 		return;
 	}
 
-	self->new_mission();
+	self->mission_dispatch();
 }
 
 crawler::crawler() {
 	filter = new bloom_filter(2000);
 	persist = new persistor("result\\", "url_relations.txt", 200);
-	is_init = true;
 	conn = new connection(0);
+	parser = new http_parser;
+	is_init = true;
+	
 	count = 0;
 	max_page = 0;
+
+	conn->set_cb(connection_read_cb, nullptr, nullptr, connection_close_cb, connection_connected_cb, this);
 }
 
 crawler::crawler(int argc, char ** argv) {
@@ -164,10 +169,14 @@ void crawler::run(const string &entry, int count) {
 	if (!is_init)
 		return;
 
+	singleton<logger>::instance()->add_file("debug.log", logger::log_level::DEBUG);
+	singleton<logger>::instance()->add_file("info.log", logger::log_level::INFO);
+	singleton<logger>::instance()->set_default_level(logger::log_level::DEBUG);
 	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "Start, entry is %s, count: %d.", entry.c_str(), count);
 	waiting_list_append(entry);
 	max_page = count;
 
+	singleton<ev_mainloop>::instance()->set_period(check, this);
 	singleton<ev_mainloop>::instance()->loop();
 
 	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "Mission complete.");

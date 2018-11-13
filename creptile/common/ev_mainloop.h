@@ -6,6 +6,10 @@ struct event_base;
 
 class ev_mainloop {
 	struct event_base *evbase;
+	
+	void(*period_check)(void*);
+	void *arg;
+
 	bool done;
 
 	ev_mainloop();
@@ -24,5 +28,7 @@ public:
 	inline void mark_for_close() {
 		done = true;
 	}
+
+	void set_period(void(*period_check)(void*), void *arg);
 };
 

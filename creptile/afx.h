@@ -24,6 +24,7 @@
 
 #ifdef WIN32
 #define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #endif
 
 //#define nullptr NULL
