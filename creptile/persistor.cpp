@@ -66,8 +66,7 @@ void persistor::persist_body(const string &url, const string & body) {
 	ofstream fout(filename);
 
 	if (!fout.is_open()) {
-		singleton<logger>::instance()->warm_fn(__FILE__, __LINE__, __func__, 
-			"Could not open file %s to persist &s.", filename.c_str(), url.c_str());
+		logger::warm("Could not open file %s to persist &s.", filename.c_str(), url.c_str());
 		return;
 	}
 

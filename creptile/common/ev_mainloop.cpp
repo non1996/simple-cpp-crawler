@@ -35,7 +35,7 @@ event_base * ev_mainloop::get_base() {
 void ev_mainloop::loop() {
 	int32_t res;
 
-	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "Mainloop start.");
+	logger::notice("Mainloop start.");
 
 	while (!done) {
 		res = event_base_loop(evbase, EVLOOP_ONCE | EVLOOP_NONBLOCK);
@@ -43,13 +43,8 @@ void ev_mainloop::loop() {
 			mark_for_close();
 			continue;
 		}
-		period_check(arg);
+		period->emit();
 	}
 
-	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "Mainloop exit.");
-}
-
-void ev_mainloop::set_period(void(*_period_check)(void *), void *_arg) {
-	period_check = _period_check;
-	arg = _arg;
+	logger::notice("Mainloop exit.");
 }

@@ -75,12 +75,12 @@ bool logger::add_file(const char * filename, log_level level) {
 	if ((file = fopen(filename, "w")) == nullptr) 
 		return false;
 	logfile *new_logger = new logfile(level, filename, file);
-	logfiles.push_back(new_logger);
+	singleton<logger>::instance()->logfiles.push_back(new_logger);
 	return true;
 }
 
 void logger::set_default_level(log_level level) {
-	logfiles.front()->lowest_level = level;
+	singleton<logger>::instance()->logfiles.front()->lowest_level = level;
 }
 
 void logger::set_silence() {
@@ -88,45 +88,45 @@ void logger::set_silence() {
 }
 
 void logger::enable() {
-	do_log = true;
+	singleton<logger>::instance()->do_log = true;
 }
 
 void logger::disable() {
-	do_log = false;
+	singleton<logger>::instance()->do_log = false;
 }
 
 void logger::error_fn(const char * file, uint32_t line, const char * func, const char * fomat, ...) {
 	va_list args;
 	va_start(args, fomat);
-	fn(log_level::ERR, file, line, func, fomat, args);
+	singleton<logger>::instance()->fn(log_level::ERR, file, line, func, fomat, args);
 	va_end(args);
 }
 
 void logger::warm_fn(const char * file, uint32_t line, const char * func, const char * fomat, ...) {
 	va_list args;
 	va_start(args, fomat);
-	fn(log_level::WARM, file, line, func, fomat, args);
+	singleton<logger>::instance()->fn(log_level::WARM, file, line, func, fomat, args);
 	va_end(args);
 }
 
 void logger::notice_fn(const char * file, uint32_t line, const char * func, const char * fomat, ...) {
 	va_list args;
 	va_start(args, fomat);
-	fn(log_level::NOTICE, file, line, func, fomat, args);
+	singleton<logger>::instance()->fn(log_level::NOTICE, file, line, func, fomat, args);
 	va_end(args);
 }
 
 void logger::info_fn(const char * file, uint32_t line, const char * func, const char * fomat, ...) {
 	va_list args;
 	va_start(args, fomat);
-	fn(log_level::INFO, file, line, func, fomat, args);
+	singleton<logger>::instance()->fn(log_level::INFO, file, line, func, fomat, args);
 	va_end(args);
 }
 
 void logger::debug_fn(const char * file, uint32_t line, const char * func, const char * fomat, ...) {
 	va_list args;
 	va_start(args, fomat);
-	fn(log_level::DEBUG, file, line, func, fomat, args);
+	singleton<logger>::instance()->fn(log_level::DEBUG, file, line, func, fomat, args);
 	va_end(args);
 }
 
@@ -138,7 +138,7 @@ void logger::logcmd::log(const char *time, const char *level, const char * file,
 	uint32_t line, const char * func, const char * fomat, va_list args) {
 	printf("%s, %s %s(): ", time, level, func);
 	vprintf(fomat, args);
-	printf("\tfile: %s, line: %d", strrchr(file, SLASH) ? strrchr(file, SLASH) + 1 : file, line);
+	printf("\t[file: %s, line: %d]", strrchr(file, SLASH) ? strrchr(file, SLASH) + 1 : file, line);
 	putchar('\n');
 }
 
@@ -157,6 +157,6 @@ void logger::logfile::log(const char *time, const char *level, const char * file
 	uint32_t line, const char * func, const char * fomat, va_list args) {
 	fprintf(this->file, "%s, %s %s(): ", time, level, func);
 	vfprintf(this->file, fomat, args);
-	fprintf(this->file, "\tfile: %s, line: %d", strrchr(file, SLASH) ? strrchr(file, SLASH) + 1 : file, line);
+	fprintf(this->file, "\t[file: %s, line: %d]", strrchr(file, SLASH) ? strrchr(file, SLASH) + 1 : file, line);
 	fprintf(this->file, "\n");
 }

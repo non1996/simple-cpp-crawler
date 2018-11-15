@@ -2,7 +2,7 @@
 #include "http.h"
 #include "bloom_filter.h"
 #include "persistor.h"
-#include "connection.h"
+#include "connection_pool.h"
 #include "connection_http.h"
 #include "util.h"
 #include "log.h"
@@ -31,70 +31,40 @@ void crawler::resolve_body(const string & url_from, const string & body) {
 	}
 }
 
-void crawler::mission_dispatch() {
-	auto &url = waiting.front();
-	
-	count++;
-	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "New mission %dth.", count);
-	conn->connect(url);
-	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__, "Waiting Urls: %d.", waiting.size());
-	waiting.pop_front();
+void crawler::resolve_html(const string &url, const string &body) {
+	resolve_body(url, body);
+	persist->persist_body(url, body);
 }
 
-void crawler::connection_connected_cb(void * craw, void *_conn) {
-	crawler *self = static_cast<crawler*>(craw);
-	connection_http *conn = static_cast<connection_http*>(_conn);
-
-	conn->send_req();
-}
-
-void crawler::connection_read_cb(void * craw, void * _conn) {
-	crawler *self = static_cast<crawler*>(craw);
-	connection_http *conn = static_cast<connection_http*>(_conn);
-
-	http_parser *parser = conn->recv_rply();
-
-	auto &status_line = parser->get_status_line();
-	auto &body = parser->get_body();
-	auto &url = conn->get_url();
-
-	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__,
-		"Receive http reply, body length: %d, status: %s.", body.size(), status_line.substr(9, 3).c_str());
-
-	self->resolve_body(url, body);
-	self->persist->persist_body(url, body);
-	self->conn->close();
-}
-
-void crawler::check(void * craw) {
-	crawler *self = static_cast<crawler*>(craw);
-
-	if (!self->conn->is_close())
-		return;
-
-	if (self->waiting.empty() || self->max_page <= self->count) {
+void crawler::check() {
+	if ((waiting.empty() || max_page <= count) && !pool->has_busy()) {
 		singleton<ev_mainloop>::instance()->mark_for_close();
 		return;
 	}
 
-	self->mission_dispatch();
+	while (max_page > count && pool->has_ready() && !waiting.empty()) {
+		count++;
+		pool->dispatch_mission(waiting.front());
+		waiting.pop_front();
+		logger::notice("New mission %dth, Waiting Urls: %d.", count, waiting.size());
+	}
 }
 
-crawler::crawler() {
-	filter = new bloom_filter(2000);
-	persist = new persistor("result\\", "url_relations.txt", 200);
-	conn = new connection_http(0);
+crawler::crawler()
+	:filter(new bloom_filter(2000)), 
+	persist(new persistor("result\\", "url_relations.txt", 200)),
+	pool(new connection_pool(1)){
+
+	pool->http_come->connect(std::bind(&crawler::resolve_html, this, _1, _2));
+
 	is_init = true;
-	
 	count = 0;
 	max_page = 0;
-
-	conn->set_cb(connection_read_cb, nullptr, nullptr, nullptr, connection_connected_cb, this);
 }
 
 crawler::crawler(int argc, char ** argv) {
 	if (argc < 3) {
-		singleton<logger>::instance()->warm_fn(__FILE__, __LINE__, __func__, "Usage: %s [url] [output file].");
+		logger::warm("Usage: %s [url] [output file].");
 		is_init = false;
 		return;
 	}
@@ -104,23 +74,23 @@ crawler::crawler(int argc, char ** argv) {
 }
 
 crawler::~crawler() {
-	delete filter;
-	delete persist;
+
 }
 
 void crawler::run(const string &entry, int count) {
 	if (!is_init)
 		return;
 
-	singleton<logger>::instance()->add_file("debug.log", logger::log_level::DEBUG);
-	singleton<logger>::instance()->add_file("info.log", logger::log_level::INFO);
-	singleton<logger>::instance()->set_default_level(logger::log_level::DEBUG);
-	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "Start, entry is %s, count: %d.", entry.c_str(), count);
+	logger::add_file("debug.log", logger::log_level::DEBUG);
+	logger::add_file("info.log", logger::log_level::INFO);
+	logger::set_default_level(logger::log_level::DEBUG);
+	logger::notice("Start, entry is %s, count: %d.", entry.c_str(), count);
 	waiting_list_append(entry);
 	max_page = count;
 
-	singleton<ev_mainloop>::instance()->set_period(check, this);
+	singleton<ev_mainloop>::instance()->period->connect(std::bind(&crawler::check, this));
+
 	singleton<ev_mainloop>::instance()->loop();
 
-	singleton<logger>::instance()->notice_fn(__FILE__, __LINE__, __func__, "Mission complete.");
+	logger::notice("Mission complete.");
 }

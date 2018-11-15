@@ -29,3 +29,5 @@
 
 typedef void(*callback_fn)(void*, void*);
 #define callback(fn, arg1, arg2) do { if ((fn)) (fn)((arg1), (arg2)); } while(0)
+
+#include "my_signal.h"

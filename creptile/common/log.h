@@ -45,32 +45,34 @@ private:
 	log_level level;
 
 	logger();
-	inline const char *level_to_str(log_level level);
-	inline const char *get_time();
+	
 	void fn(log_level level, const char *file, uint32_t line, const char *func, const char *fomat, va_list args);
+
+	inline static const char *level_to_str(log_level level);
+	inline static const char *get_time();
 
 public:
 	~logger();
 
-	bool add_file(const char *filename, log_level level);
+	static bool add_file(const char *filename, log_level level);
 
-	void set_default_level(log_level level);
+	static void set_default_level(log_level level);
 
-	void set_silence();
+	static void set_silence();
 
-	void enable();
+	static void enable();
 
-	void disable();
+	static void disable();
 
-	void error_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
+	static void error_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
 
-	void warm_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
+	static void warm_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
 
-	void notice_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
+	static void notice_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
 
-	void info_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
+	static void info_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
 
-	void debug_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
+	static void debug_fn(const char *file, uint32_t line, const char *func, const char *fomat, ...);
 };
 
 #define error(format, ...) error_fn(__FILE__, __LINE__, __func__, format, ##__VA_ARGS__)

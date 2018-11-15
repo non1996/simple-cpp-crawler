@@ -2,14 +2,15 @@
 
 #include "afx.h"
 #include "singleton.h"
+#include "my_signal.h"
 struct event_base;
 
 class ev_mainloop {
-	struct event_base *evbase;
-	
-	void(*period_check)(void*);
-	void *arg;
+public:
+	shared_ptr<signal<>> period = make_shared<signal<>>();
 
+private:
+	struct event_base *evbase;
 	bool done;
 
 	ev_mainloop();
@@ -28,7 +29,5 @@ public:
 	inline void mark_for_close() {
 		done = true;
 	}
-
-	void set_period(void(*period_check)(void*), void *arg);
 };
 

@@ -6,39 +6,34 @@
 void connection::event_ev(bufferevent * bev, short events, void * conn) {
 	connection *self = static_cast<connection*>(conn);
 	if (events & BEV_EVENT_CONNECTED) {
-		singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__, "Connection %d connected.", self->global_id);
+		logger::info("Connection %d connected.", self->global_id);
 		self->set_state(state::working);
-		callback(self->connected_cb, self->arg, self);
+		self->connected->emit(self->get_id());
 	}
 	if (events & BEV_EVENT_ERROR) {
-		singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__, 
-			"Connection %d meet an error, %d[%s], it will be close.",
+		logger::info("Connection %d meet an error, %d[%s], it will be close.",
 			self->global_id, EVUTIL_SOCKET_ERROR(), evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
-
+		self->error->emit(self->get_id());
 		self->close();
-		callback(self->error_cb, self->arg, self);
 	}
 	if (events & BEV_EVENT_EOF) {
-		singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__,
-			"Connection %d meet eof, it will be close.", self->global_id);
+		logger::info("Connection %d meet eof, it will be close.", self->global_id);
+		self->closed->emit(self->get_id());
 		self->close();
-		callback(self->close_cb, self->arg, self);
 	}
 }
 
 void connection::read_ev(bufferevent * bev, void * conn) {
 	connection *self = static_cast<connection*>(conn);
-	singleton<logger>::instance()->debug_fn(__FILE__, __LINE__, __func__,
-		"Connection %d received something.", self->global_id);
-	callback(self->read_cb, self->arg, self);
+	logger::debug("Connection %d received something.", self->global_id);
+	self->readable->emit(self->get_id(), self->inbuf_size());
 }
 
 void connection::write_ev(bufferevent * bev, void * conn) {
 	(void)bev;
 	connection *self = static_cast<connection*>(conn);
-	singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__,
-		"Connection %d sent something.", self->global_id);
-	callback(self->write_cb, self->arg, self);
+	logger::info("Connection %d sent something.", self->global_id);
+	self->writed->emit(self->get_id());
 }
 
 void connection::set_state(state s) {
@@ -57,9 +52,6 @@ void connection::set_state(state s) {
 	}
 
 	this->s = s;
-	//if (linked_connection && is_master) {
-	//	linked_connection->set_state(s);
-	//}
 }
 
 void connection::setup_bev(evutil_socket_t fd) {
@@ -90,20 +82,10 @@ connection::connection(uint32_t global_id) {
 	bev = nullptr;
 	s = state::closed;
 
-	//linked_connection = nullptr;
-
 	remote_port = 0;
 	local_port = 0;
 
-	//is_master = true;
 	to_close = false;
-
-	read_cb = nullptr;
-	write_cb = nullptr;
-	error_cb = nullptr;
-	close_cb = nullptr;
-	connected_cb = nullptr;
-	arg = nullptr;
 }
 
 connection::~connection() {
@@ -114,7 +96,7 @@ bool connection::connect(const std::string & ip, uint16_t port) {
 	if (is_to_close())
 		return false;
 
-	if (/*linked_connection || */s != state::closed)
+	if (s != state::closed)
 		return true;
 
 	struct sockaddr_in sin;
@@ -123,7 +105,7 @@ bool connection::connect(const std::string & ip, uint16_t port) {
 	setup_bev(-1);
 
 	if (bufferevent_socket_connect(bev, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
-		singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__, "Connection %lu connect to %s:%d failed.", global_id, ip.c_str(), port);
+		logger::info("Connection %lu connect to %s:%d failed.", global_id, ip.c_str(), port);
 		return false;
 	}
 
@@ -131,7 +113,7 @@ bool connection::connect(const std::string & ip, uint16_t port) {
 	remote_address = ip;
 	remote_port = port;
 
-	singleton<logger>::instance()->info_fn(__FILE__, __LINE__, __func__, "Connection %lu launch connect to %s:%d successfully, wait for connected.", global_id, ip.c_str(), port);
+	logger::info("Connection %lu launch connect to %s:%d successfully, wait for connected.", global_id, ip.c_str(), port);
 
 	return true;
 }
@@ -139,9 +121,6 @@ bool connection::connect(const std::string & ip, uint16_t port) {
 void connection::close() {
 	if (s == state::closed)
 		return;
-
-	//if (linked_connection && is_master)
-	//	linked_connection->close();
 	
 	if (bev) {
 		bufferevent_free(bev);
@@ -198,14 +177,4 @@ size_t connection::inbuf_size() {
 
 size_t connection::outbuf_size() {
 	return evbuffer_get_length(bufferevent_get_output(bev));
-}
-
-void connection::set_cb(callback_fn _read_cb, callback_fn _write_cb, callback_fn _error_cb, 
-	callback_fn _close_cb, callback_fn _connected_cb, void *_arg) {
-	read_cb = _read_cb;
-	write_cb = _write_cb;
-	error_cb = _error_cb;
-	close_cb = _close_cb;
-	connected_cb = _connected_cb;
-	arg = _arg;
 }

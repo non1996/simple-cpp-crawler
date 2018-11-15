@@ -18,6 +18,12 @@ public:
 		connecting,
 		working,
 	};
+	
+	shared_ptr<signal<size_t>> connected = make_shared<signal<size_t>>();
+	shared_ptr<signal<size_t>> writed = make_shared<signal<size_t>>();
+	shared_ptr<signal<size_t, size_t>> readable = make_shared<signal<size_t, size_t>>();
+	shared_ptr<signal<size_t>> closed = make_shared<signal<size_t>>();
+	shared_ptr<signal<size_t>> error = make_shared<signal<size_t>>();
 
 private:
 	uint64_t bytes_read;
@@ -29,24 +35,12 @@ private:
 
 	state s;
 
-	//connection *linked_connection;
+	string remote_address, local_address;
+	uint16_t remote_port, local_port;
 
-	std::string remote_address;
-	std::string local_address;
-	uint16_t remote_port;
-	uint16_t local_port;
-
-	//bool is_master;
 	bool to_close;
 
 protected:
-	callback_fn read_cb;
-	callback_fn write_cb;
-	callback_fn error_cb;
-	callback_fn close_cb;
-	callback_fn connected_cb;
-	void *arg;
-
 	void set_state(state s);
 
 	inline struct bufferevent *get_bev() {
@@ -97,7 +91,7 @@ public:
 		return s;
 	}
 
-	bool connect(const std::string &ip, uint16_t port);
+	bool connect(const string &ip, uint16_t port);
 	virtual void close();
 	bool is_close();
 
@@ -110,6 +104,4 @@ public:
 
 	size_t inbuf_size();
 	size_t outbuf_size();
-
-	void set_cb(callback_fn read_cb, callback_fn write_cb, callback_fn error_cb, callback_fn close_cb, callback_fn connected_cb, void *arg);
 };

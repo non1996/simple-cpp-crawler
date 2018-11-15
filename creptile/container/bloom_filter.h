@@ -3,24 +3,26 @@
 #include "afx.h"
 #include "bitset.h"
 #include "util.h"
+#include <memory>
+using std::unique_ptr;
+
 class bitset;
 
 class bloom_filter {
 	constexpr uint32_t bit(uint32_t num) { return num & mask; };
 	
 	size_t mask;
-	bitset *bs;
+	unique_ptr<bitset> bs;
 
 public:
 	bloom_filter(size_t max_elem) {
 		assert(max_elem);
 		size_t nbits = 1u << ((size_t)floor(log2(max_elem)) + 3);
 		mask = nbits - 1;
-		bs = new bitset(nbits);
+		bs = unique_ptr<bitset>(new bitset(nbits));
 	}
 
 	~bloom_filter() {
-		delete bs;
 	}
 
 	inline void add(const std::string &data) {

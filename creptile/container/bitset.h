@@ -16,30 +16,20 @@ class bitset {
 
 public:
 	bitset(size_t count) {
-		arr = mem_alloc_zero<uint32_t>(store_size(count));
+		arr = new uint32_t[store_size(count)];
+		memset(arr, 0, sizeof(uint32_t) * store_size(count));
 		nbit = count;
 	}
 
 	~bitset() {
-		mem_free(arr);
+		delete[] arr;
 	}
 
 	inline size_t size(bitset *self) {
 		return self->nbit;
 	}
 
-	//inline void check(bitset *self, size_t expect) {
-	//	if (self->nbit >= expect)
-	//		return;
-
-	//	while (self->nbit < expect)
-	//		self->nbit <<= 1;
-
-	//	mem_realloc(uint32_t, self->arr, store_size(self->nbit));
-	//}
-
 	inline void set(size_t bit) {
-		//bitset_check(self, bit);
 		if (bit >= nbit)
 			return;
 

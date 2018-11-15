@@ -1,15 +1,21 @@
 #pragma once
 
 #include "connection.h"
+#include <memory>
+using std::unique_ptr;
 
 class http_parser;
 
 class connection_http :
 	public connection {
+public:
+	shared_ptr<signal<const string &, const string &>> http_come = 
+		make_shared<signal<const string &, const string &>>();
+
 private:
 	string url;
 	string host, resource;
-	http_parser *parser;
+	unique_ptr<http_parser> parser;
 
 	static inline string dns_parse(const string &url);
 
