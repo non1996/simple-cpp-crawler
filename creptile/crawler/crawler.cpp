@@ -62,22 +62,23 @@ crawler::crawler()
 	max_pages = 20;
 }
 
-crawler::crawler(int argc, char ** argv) {
-	if (argc < 3) {
-		logger::warm("Usage: %s [url] [output file].", argv[0]);
-		is_init = false;
-		return;
-	}
+crawler::crawler(const string & _entry, const string & output)
+	:filter(new bloom_filter(2000)),
+	persist(new persistor("result\\", output, 200)),
+	pool(new connection_pool(5)),
+	entry(_entry),
+	count(0),
+	max_pages(20){
 
-	waiting.emplace_back(argv[1]);
-	crawler();
+	pool->http_come->connect(std::bind(&crawler::resolve_html, this, _1, _2));
+	is_init = true;
 }
 
 crawler::~crawler() {
 
 }
 
-void crawler::run(const string &entry) {
+void crawler::run() {
 	if (!is_init)
 		return;
 
@@ -94,4 +95,14 @@ void crawler::run(const string &entry) {
 	singleton<ev_mainloop>::instance()->loop();
 
 	logger::notice("Mission complete.");
+}
+
+void crawler_work(const string & url, const string & output) {
+	crawler c(url, output);
+	c.run();
+}
+
+void crawler_work(const string & ip, uint16_t port, const string & output) {
+	char buf[16];
+	crawler_work(ip + ":" + itoa(port, buf, 10), output);
 }

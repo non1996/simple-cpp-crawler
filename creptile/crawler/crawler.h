@@ -20,6 +20,8 @@ private:
 	unique_ptr<persistor> persist;
 	unique_ptr<connection_pool> pool;
 
+	string entry;
+
 	size_t max_pages, count;
 	bool is_init;
 	bool done;
@@ -29,10 +31,12 @@ private:
 
 public:
 	crawler();
-	crawler(int argc, char **argv);
+	crawler(const string &entry, const string &output);
 	~crawler();
 
-	
-	void run(const string &entry);
+	void run();
 	void check();
 };
+
+void crawler_work(const string &url, const string &output);
+void crawler_work(const string &ip, uint16_t port, const string &output);

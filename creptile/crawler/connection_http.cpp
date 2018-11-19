@@ -108,6 +108,7 @@ bool connection_http::send_req() {
 	string req
 		= "GET " + resource + " HTTP/1.1\r\n"
 		+ "HOST: " + host + "\r\n"
+		+ "Accept: text/html"
 		+ "Connection: close\r\n\r\n";
 
 	logger::debug("Send http request, host: %s, get: %s.", 

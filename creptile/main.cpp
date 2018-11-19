@@ -5,11 +5,10 @@
 using namespace std;
 
 int main() {
-	/*crawler c;
-
-	c.run("www.hao123.com");*/
-
+#if defined(CRAWLER_MODE)
+	crawler_work("www.hao123.com", "url_relations.txt");
+#elif defined(PAGERANK_MODE)
 	pagerank_work("result\\url-relations.txt", "result\\url-top10.txt");
-
+#endif
 	return 0;
 }
