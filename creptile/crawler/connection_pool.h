@@ -15,8 +15,7 @@ class bitset;
 
 class connection_pool {
 public:
-	shared_ptr<signal<const string&, const string&>> http_come = 
-		make_shared<signal<const string&, const string&>>();
+	signal(http_come, const string&, const string&);
 
 private:
 	vector<shared_ptr<connection_http>> conns;

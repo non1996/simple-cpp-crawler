@@ -11,13 +11,13 @@ public:
 };
 
 template <typename ... Args>
-class slot
+class slot_s
 	: public invokable<Args...> {
 private:
 	std::function<void(Args&&...)> func = nullptr;
 
 public:
-	slot(const std::function<void(Args&&...)> &_func)
+	slot_s(const std::function<void(Args&&...)> &_func)
 		:func(_func){
 
 	}
@@ -28,17 +28,17 @@ public:
 };
 
 template <typename ... Args>
-class signal 
+class signal_s 
 	: public invokable<Args...> {
 private:
 	std::vector<std::shared_ptr<invokable<Args...>>> slots;
 
 public:
 	void connect(const std::function<void(Args&&...)> &func) {
-		slots.emplace_back(new slot<Args...>(func));
+		slots.emplace_back(new slot_s<Args...>(func));
 	}
 
-	void connect(const std::shared_ptr<signal<Args...>> &inv) {
+	void connect(const std::shared_ptr<signal_s<Args...>> &inv) {
 		slots.push_back(inv);
 	}
 
@@ -51,6 +51,12 @@ public:
 		(*this)(std::forward<Args>(args)...);
 	}
 };
+
+#define signal(name, ...) \
+	shared_ptr<signal_s<##__VA_ARGS__>> name = \
+	make_shared<signal_s<##__VA_ARGS__>>()
+
+#define slot
 
 using namespace std::placeholders;
 using std::shared_ptr;

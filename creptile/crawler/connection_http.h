@@ -9,8 +9,7 @@ class http_parser;
 class connection_http :
 	public connection {
 public:
-	shared_ptr<signal<const string &, const string &>> http_come = 
-		make_shared<signal<const string &, const string &>>();
+	signal(http_come, const string &, const string &);
 
 private:
 	string url;

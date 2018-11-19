@@ -6,7 +6,6 @@
 
 inline string connection_http::dns_parse(const string & host) {
 	hostent *hostt = gethostbyname(host.c_str());
-	//auto res = getaddrinfo(host.c_str(), nullptr, &hints, );
 	static char str[128];
 	return hostt ? inet_ntop(hostt->h_addrtype, hostt->h_addr_list[0], str, sizeof(str)) : "";
 }
@@ -20,8 +19,15 @@ void connection_http::read_ev(bufferevent * bev, void * _conn) {
 	buf = new char[len];
 	self->recv(buf, &len); 
 
-	if (self->parser->parse(buf, len))
-		self->http_come->emit(self->url, self->parser->get_body());
+	if (self->parser->parse(buf, len)) {
+		auto &status = self->parser->get_status_line();
+		if (status.find("200") == string::npos)
+			logger::warm("Receive reply with failed status: %s, ignore this.", status.c_str());
+		else
+			self->http_come->emit(self->url, self->parser->get_body());
+		self->closed->emit(self->get_id());
+		self->close();
+	}
 
 	delete[] buf;
 }
@@ -29,7 +35,7 @@ void connection_http::read_ev(bufferevent * bev, void * _conn) {
 void connection_http::event_ev(bufferevent * bev, short events, void * conn) {
 	connection_http *self = static_cast<connection_http*>(conn);
 	if (events & BEV_EVENT_CONNECTED) {
-		logger::info("Connection %d connected.", self->get_id());
+		logger::info("Connection %d connected, will send http request.", self->get_id());
 		self->set_state(state::working);
 		self->send_req();
 		return;
@@ -37,11 +43,15 @@ void connection_http::event_ev(bufferevent * bev, short events, void * conn) {
 	if (events & BEV_EVENT_EOF) {
 		logger::info("Connection %d meet eof, it will be close.", self->get_id());
 			
-		if (self->parser->is_type_close())
-			self->http_come->emit(self->url, self->parser->get_body());
+		if (self->parser->is_type_close()) {
+			auto &status = self->parser->get_status_line();
+			if (status.find("200") == string::npos)
+				logger::warm("Receive reply with failed status: %s, ignore this.", status.c_str());
+			else
+				self->http_come->emit(self->url, self->parser->get_body());
+		}
 
 		self->closed->emit(self->get_id());
-
 		self->close();
 		return;
 	}
@@ -67,6 +77,9 @@ const string & connection_http::get_url() {
 }
 
 bool connection_http::connect(const string & _url) {
+	if (get_state() != connection::state::closed)
+		return true;
+
 	auto pair = util::string_split_pair(_url, '/');
 	host = pair.first;
 	resource = "/" + pair.second;
@@ -89,6 +102,9 @@ void connection_http::close() {
 }
 
 bool connection_http::send_req() {
+	if (get_state() != connection::state::working)
+		return false;
+
 	string req
 		= "GET " + resource + " HTTP/1.1\r\n"
 		+ "HOST: " + host + "\r\n"

@@ -15,9 +15,6 @@ namespace {
 	}
 }
 
-
-
-
 ev_mainloop::ev_mainloop() {
 	network_startup();
 	atexit(network_cleanup);

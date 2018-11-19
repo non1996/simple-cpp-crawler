@@ -19,11 +19,11 @@ public:
 		working,
 	};
 	
-	shared_ptr<signal<size_t>> connected = make_shared<signal<size_t>>();
-	shared_ptr<signal<size_t>> writed = make_shared<signal<size_t>>();
-	shared_ptr<signal<size_t, size_t>> readable = make_shared<signal<size_t, size_t>>();
-	shared_ptr<signal<size_t>> closed = make_shared<signal<size_t>>();
-	shared_ptr<signal<size_t>> error = make_shared<signal<size_t>>();
+	signal(connected, size_t);
+	signal(writed, size_t);
+	signal(readable, size_t, size_t);
+	signal(closed, size_t);
+	signal(error, size_t);
 
 private:
 	uint64_t bytes_read;

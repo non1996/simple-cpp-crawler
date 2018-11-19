@@ -32,7 +32,7 @@ void connection::read_ev(bufferevent * bev, void * conn) {
 void connection::write_ev(bufferevent * bev, void * conn) {
 	(void)bev;
 	connection *self = static_cast<connection*>(conn);
-	logger::info("Connection %d sent something.", self->global_id);
+	logger::debug("Connection %d sent something.", self->global_id);
 	self->writed->emit(self->get_id());
 }
 

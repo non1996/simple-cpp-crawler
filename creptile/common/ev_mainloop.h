@@ -7,7 +7,7 @@ struct event_base;
 
 class ev_mainloop {
 public:
-	shared_ptr<signal<>> period = make_shared<signal<>>();
+	signal(period);
 
 private:
 	struct event_base *evbase;
