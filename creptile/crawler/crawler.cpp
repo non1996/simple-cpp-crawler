@@ -1,76 +1,45 @@
 #include "crawler.h"
 #include "http.h"
-#include "bloom_filter.h"
+#include "html.h"
 #include "persistor.h"
 #include "connection_pool.h"
-#include "connection_http.h"
+#include "bloom_filter.h"
+#include "waiting_queue.h"
 #include "util.h"
 #include "log.h"
 #include "ev_mainloop.h"
+
 #include <regex>
 
-void crawler::waiting_list_append(const string & url) {
-	if (!filter->contains(url)) {
-		waiting.push_back(url);
-		filter->add(url);
-	}
-}
-
-void crawler::resolve_html(const string &url, const string &body) {
-	logger::debug("Resolve html from url: %s", url.c_str());
-
-	if (body.empty()) {
-		return;
-	}
-	std::smatch result;
-	auto curIter = body.begin();
-	auto endIter = body.end();
-	while (std::regex_search(curIter, endIter, result, std::regex("href=\"(https?:)?//\\S+\""))) {
-		auto new_url = std::regex_replace(result[0].str(), std::regex("href=\"(https?:)?//(\\S+)\""), "$2");
-		waiting_list_append(new_url);
-		persist->append(url, new_url);
-		curIter = result[0].second;
-	}
-
-	persist->persist_body(url, body);
-}
-
 void crawler::check() {
-	if ((waiting.empty() || max_pages <= count) && !pool->has_busy()) {
+	if ((waiting->empty() || max_pages <= count) && !pool->has_busy()) {
 		singleton<ev_mainloop>::instance()->mark_for_close();
 		logger::notice("No more missions, mark for close.");
 		return;
 	}
 
-	while (max_pages > count && pool->has_ready() && !waiting.empty()) {
+	while (max_pages > count && pool->has_ready() && !waiting->empty()) {
 		count++;
-		logger::notice("New mission %dth, Waiting Urls: %d.", count, waiting.size() - 1);
-		pool->dispatch_mission(waiting.front());
-		waiting.pop_front();
+		logger::notice("New mission %dth, Waiting Urls: %d.", count, waiting->size() - 1);
+		pool->dispatch_mission(waiting->front());
+		waiting->pop();
 	}
 }
 
-crawler::crawler()
-	:filter(new bloom_filter(2000)), 
-	persist(new persistor("result\\", "url_relations.txt", 200)),
-	pool(new connection_pool(5)){
-
-	pool->http_come->connect(std::bind(&crawler::resolve_html, this, _1, _2));
-
-	is_init = true;
-	count = 0;
-	max_pages = 20;
-}
-
 crawler::crawler(const string & _entry, const string & output)
-	:filter(new bloom_filter(2000)),
+	:waiting(new waiting_queue(new bloom_filter(2000))),
 	persist(new persistor("result\\", output, 200)),
 	pool(new connection_pool(5)),
+	parser(new html_parser),
 	entry(_entry),
 	count(0),
 	max_pages(20){
 
-	pool->http_come->connect(std::bind(&crawler::resolve_html, this, _1, _2));
+	pool->http_come->connect(std::bind(&html_parser::parse, parser.get(), _1, _2));
+	parser->to_fetch->connect(std::bind(&waiting_queue::append, waiting.get(), _1));
+	parser->to_persist->connect(std::bind(&persistor::append, persist.get(), _1, _2));
+	singleton<ev_mainloop>::instance()->period->connect(std::bind(&crawler::check, this));
+
 	is_init = true;
 }
 
@@ -85,11 +54,8 @@ void crawler::run() {
 	logger::add_file("debug.log", logger::log_level::DEBUG);
 	logger::add_file("info.log", logger::log_level::INFO);
 	logger::set_default_level(logger::log_level::DEBUG);
-	
-	waiting_list_append(entry);
 
-	singleton<ev_mainloop>::instance()->period->connect(std::bind(&crawler::check, this));
-
+	waiting->append(entry);
 	logger::notice("Start, entry is %s, max pages: %d.", entry.c_str(), max_pages);
 
 	singleton<ev_mainloop>::instance()->loop();

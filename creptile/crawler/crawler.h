@@ -7,18 +7,18 @@ using std::list;
 using std::string;
 using std::unique_ptr;
 
+class waiting_queue;
 class persistor;
-class bloom_filter;
 class connection_pool;
 class http_parser;
+class html_parser;
 
 class crawler {
 private:
-	list<string> waiting;
-
-	unique_ptr<bloom_filter> filter;
+	unique_ptr<waiting_queue> waiting;
 	unique_ptr<persistor> persist;
 	unique_ptr<connection_pool> pool;
+	unique_ptr<html_parser> parser;
 
 	string entry;
 
@@ -26,11 +26,7 @@ private:
 	bool is_init;
 	bool done;
 
-	void waiting_list_append(const string &url);
-	void resolve_html(const string &url, const string &body);
-
 public:
-	crawler();
 	crawler(const string &entry, const string &output);
 	~crawler();
 

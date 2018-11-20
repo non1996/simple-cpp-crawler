@@ -1,17 +1,21 @@
 #pragma once
 
-#include <vector>
-#include <string>
+#include "afx.h"
+#include "my_signal.h"
+using std::string;
 
-class html {
+class html_parser {
+public:
+	signal(to_fetch, const string &);
+	signal(to_persist, const string &, const string &);
+
 private:
 	static const char *url_regex;
-	html();
 
 public:
-	
-	~html();
+	html_parser();
+	~html_parser();
 
-	static bool parse_url(const std::string &body, std::vector<std::string> &res);
+	void parse(const string &url, const string &body);
 };
 
