@@ -32,7 +32,7 @@ typedef void(*callback_fn)(void*, void*);
 
 #include "my_signal.h"
 
-#if 1
+#if 0
 #define CRAWLER_MODE
 #else
 #define PAGERANK_MODE

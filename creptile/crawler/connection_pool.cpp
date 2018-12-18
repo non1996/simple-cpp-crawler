@@ -30,7 +30,9 @@ bool connection_pool::dispatch_mission(const string & url) {
 	
 	auto conn = ready.front();
 
-	conn->connect(url);
+	if (!conn->connect(url))
+		return false;
+
 	ready.pop_front();
 
 	return true;

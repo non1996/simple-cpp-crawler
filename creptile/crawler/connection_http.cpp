@@ -22,9 +22,14 @@ void connection_http::read_ev(bufferevent * bev, void * _conn) {
 	if (self->parser->parse(buf, len)) {
 		auto &status = self->parser->get_status_line();
 		if (status.find("200") == string::npos)
-			logger::warm("Receive reply with failed status: %s, ignore this.", status.c_str());
-		else
+			logger::warm("Fetch url: %s, receive reply with failed status: %s, ignore this.", 
+				self->url.c_str(), status.c_str());
+		else {
+			logger::info("Fetch url: %s, success.",
+				self->url.c_str());
 			self->http_come->emit(self->url, self->parser->get_body());
+		}
+
 		self->closed->emit(self->get_id());
 		self->close();
 	}
@@ -85,9 +90,20 @@ bool connection_http::connect(const string & _url) {
 	resource = "/" + pair.second;
 	url = _url;
 
-	std::string ip = dns_parse(host);
-	if (ip.empty())
-		return false;
+	logger::info("Try to connect to host: %s.", host.c_str());
+
+	//std::string ip = dns_parse(host);
+	//if (ip.empty()) {
+	//	logger::warm("DNS parse failed, request host: %s.", host.c_str());
+	//	return false;
+	//}	
+	//
+	//if (ip != "10.108.85.210") {
+	//	logger::warm("IP %s out of school, ignore.", ip.c_str());
+	//	return false;
+	//}
+
+	std::string ip = "10.108.85.210";
 
 	parser->reset();
 

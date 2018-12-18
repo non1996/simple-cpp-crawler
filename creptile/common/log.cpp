@@ -150,6 +150,7 @@ logger::logfile::logfile(log_level lowest, const char * filename, FILE * file)
 
 logger::logfile::~logfile() {
 	delete[] filename;
+	fflush(file);
 	fclose(file);
 }
 

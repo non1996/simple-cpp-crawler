@@ -67,6 +67,12 @@ bool http_parser::state_line::parse(http_parser *hp) {
 	if ((end = hp->buf.find("\r\n", hp->offset)) != string::npos) {
 		hp->line = hp->buf.substr(hp->offset, end);
 		hp->offset = end + 2;
+
+		if (hp->line.find("200") == string::npos) {				//	meet error
+			hp->set_state(singleton<state>::instance());
+			return true;
+		}
+
 		hp->set_state(singleton<state_headers>::instance());
 		return true;
 	}
@@ -98,7 +104,7 @@ bool http_parser::state_headers::parse(http_parser * hp) {
 		if (util::string_equal_nocase(header_p.first, transfer_coding_str))
 			hp->type = trans_type::chunk;
 		if (util::string_equal_nocase(header_p.first, content_length_str)) {
-			hp->type = trans_type::close;
+			hp->type = trans_type::fixed;
 			hp->content_length = std::stoi(header_p.second);
 		}
 

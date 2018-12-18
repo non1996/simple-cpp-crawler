@@ -115,7 +115,7 @@ class coo_matrix {
 	};
 
 private:
-	list<coo_entry> matrix;
+	vector<coo_entry> matrix;
 
 public:
 	coo_matrix() {
@@ -124,21 +124,27 @@ public:
 	void insert(size_t row, size_t col, float value) {
 		coo_entry e(row, col, value);
 
+		matrix.emplace_back(row, col, value);
+
 		//auto res = std::find_if_not(matrix.begin(), matrix.end(),
 		//	[&e](const coo_entry&item) { return e.less_pos(item); });
 
-		for (auto iter = matrix.begin(); iter != matrix.end(); ++iter) {
-			if (e.less_pos(*iter)) {
-				if (e.same_pos(*iter)) {
-					iter->value = e.value;
-					return;
-				}
+	//	for (auto iter = matrix.begin(); iter != matrix.end(); ++iter) {
+	//		if (e.less_pos(*iter)) {
+	//			if (e.same_pos(*iter)) {
+	//				iter->value = e.value;
+	//				return;
+	//			}
 
-				matrix.insert(iter, e);
-				return;
-			}
-		}
-		matrix.push_back(e);
+	//			matrix.insert(iter, e);
+	//			return;
+	//		}
+	//	}
+	//	matrix.push_back(e);
+	}
+
+	void sort() {
+		std::sort(matrix.begin(), matrix.end(), [](const coo_entry &e1, const coo_entry &e2) { return e1.less_pos(e2); });
 	}
 
 	ell_matrix *make_ell() {
@@ -149,6 +155,10 @@ public:
 
 		for (auto &entry : matrix) {
 			ell->not_zero_nums.at(entry.col)++;
+
+			if (!ell->matrix.at(entry.row).empty() && ell->matrix.at(entry.row).back().col == entry.col)
+				continue;
+
 			ell->matrix.at(entry.row).emplace_back(entry.col, entry.value);
 		}
 		return ell;

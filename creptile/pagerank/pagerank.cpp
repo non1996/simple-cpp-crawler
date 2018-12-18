@@ -14,7 +14,10 @@ bool pagerank::load_relation() {
 	ifstream fin(infile);
 	stringstream ss;
 
+	logger::notice("Start Loading url relations from %s.", infile.c_str());
+
 	if (!fin.is_open()) {
+		logger::warm("Failed to open %s.", infile.c_str());
 		return false;
 	}
 
@@ -24,6 +27,10 @@ bool pagerank::load_relation() {
 		pair<string, string> temp;
 
 		std::getline(fin, url_line);
+
+		if (url_line.empty())
+			continue;
+
 		temp = util::string_split_pair(url_line, ' ');
 		idx_from = std::stoi(temp.first);
 
@@ -39,11 +46,17 @@ bool pagerank::load_relation() {
 		ss.clear();
 	}
 
-	ell.reset(coo->make_ell());
+	coo->sort();
+
+	logger::info("Url relations loaded.", infile.c_str());
+
 	return true;
 }
 
 void pagerank::make_revise_matrix() {
+	logger::notice("Make revice matrix.");
+
+	ell.reset(coo->make_ell());
 	ell->make_trans();
 	ell->scalar_mult(1 - alpha);
 }
@@ -51,14 +64,16 @@ void pagerank::make_revise_matrix() {
 void pagerank::caculte() {
 	size_t urls_num = urls.size();									//	N
 	my_vector e(urls_num, alpha / (float)urls_num);					//	(alpha / N) * Ve
-	my_vector ranks(urls_num, 1 / (float)urls_num), res(ranks);		//	pageranks: Vr
-	my_vector ;											
+	my_vector ranks(urls_num, 1 / (float)urls_num), res(ranks);		//	pageranks: Vr									
 	size_t times = 0;
+
+	logger::notice("Start caculating.");
 
 	do {
 		ranks = res;												
 		res = ell->mult_vector(ranks);
 		res.add(e);
+		logger::info("%dth times.", times);
 	} while (++times < times_threshold && !res.similar(ranks, accuracy_threshold));
 
 	for (size_t index = 0; index < urls_num; ++index) {
@@ -71,7 +86,10 @@ bool pagerank::output() {
 
 	ofstream fout(outfile);
 
+	logger::notice("Start output url relations to %s.", outfile.c_str());
+
 	if (!fout.is_open()) {
+		logger::warm("Failed to open %s.", outfile.c_str());
 		return false;
 	}
 
@@ -94,10 +112,15 @@ pagerank::~pagerank() {
 }
 
 void pagerank::run() {
+	logger::add_file("pagerank_debug.log", logger::log_level::DEBUG);
+	logger::set_default_level(logger::log_level::DEBUG);
+
 	load_relation();
 	make_revise_matrix();
 	caculte();
 	output();
+
+	logger::notice("Quit.", infile.c_str());
 }
 
 pagerank::rank::rank(const string & _url)

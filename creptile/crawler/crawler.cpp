@@ -27,13 +27,13 @@ void crawler::check() {
 }
 
 crawler::crawler(const string & _entry, const string & output)
-	:waiting(new waiting_queue(new bloom_filter(2000))),
+	:waiting(new waiting_queue(new bloom_filter(200000))),
 	persist(new persistor("result\\", output, 200)),
 	pool(new connection_pool(5)),
 	parser(new html_parser),
 	entry(_entry),
 	count(0),
-	max_pages(20){
+	max_pages(200000){
 
 	pool->http_come->connect(std::bind(&html_parser::parse, parser.get(), _1, _2));
 	parser->to_fetch->connect(std::bind(&waiting_queue::append, waiting.get(), _1));
@@ -53,13 +53,11 @@ void crawler::run() {
 
 	logger::add_file("debug.log", logger::log_level::DEBUG);
 	logger::add_file("info.log", logger::log_level::INFO);
-	logger::set_default_level(logger::log_level::DEBUG);
+	logger::set_default_level(logger::log_level::INFO);
 
 	waiting->append(entry);
 	logger::notice("Start, entry is %s, max pages: %d.", entry.c_str(), max_pages);
-
 	singleton<ev_mainloop>::instance()->loop();
-
 	logger::notice("Mission complete.");
 }
 
